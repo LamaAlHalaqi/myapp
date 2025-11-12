@@ -120,4 +120,22 @@ class UserController extends Controller
         ]);
     }
 
+     public function logout(Request $request)
+{
+    $user = $request->user(); // المستخدم الحالي
+
+    if (!$user) {
+        return response()->json([
+            'message' => 'المستخدم غير مسجل دخول.'
+        ], 401);
+    }
+
+    // حذف التوكن الحالي فقط
+    $user->currentAccessToken()->delete();
+
+    return response()->json([
+        'message' => 'تم تسجيل الخروج بنجاح.'
+    ], 200);
+}
+
 }

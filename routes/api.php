@@ -11,3 +11,5 @@ Route::get('/test', function () {
     Route::post('register', [UserController::class, 'register']);
     Route::post('verify_otp', [UserController::class, 'verify']);
     Route::post('login', [UserController::class, 'login']);
+    // Route::post('logout', [UserController::class, 'logout']);
+Route::middleware('auth:sanctum')->post('/logout', [UserController::class, 'logout']);
