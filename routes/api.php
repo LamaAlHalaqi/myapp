@@ -3,6 +3,7 @@ use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Endpoint عام للاختبار
 Route::get('/test', function () {
     return response()->json(['message' => 'API is working in Laravel 12!']);
 });

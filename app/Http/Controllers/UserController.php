@@ -97,11 +97,12 @@ class UserController extends Controller
 
         // تحقق من تفعيل الحساب
         if (!$user->is_verified) {
-            // تسجيل الخروج في حال الحساب غير مفعل
+            // تسجيل الخروج لأن الحساب غير مفعّل
             Auth::logout();
 
             return response()->json([
-                'message' => 'الحساب غير مفعّل. يرجى إدخال رمز التفعيل المرسل إلى بريدك الإلكتروني.'
+                'message' => 'حسابك غير مفعّل. يجب أولاً إدخال رمز التحقق المرسل إلى بريدك الإلكتروني.',
+                'code' => 'ACCOUNT_NOT_VERIFIED'
             ], 403);
         }
 
@@ -109,7 +110,7 @@ class UserController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'تم تسجيل الدخول بنجاح',
+            'message' => 'تم تسجيل الدخول بنجاح ✅',
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
