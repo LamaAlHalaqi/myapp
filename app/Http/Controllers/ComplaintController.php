@@ -28,7 +28,7 @@ class ComplaintController extends Controller
             'attachments.*' => 'file|mimes:jpg,png,pdf,doc,docx,xls,xlsx|max:10240',
         ]);
 
-        // توليد رقم مرجعي آمن
+        // توليد رقم   مرجعي آمن
         $reference = 'REF-' . strtoupper(Str::random(10));
 
         // إنشاء الشكوى
