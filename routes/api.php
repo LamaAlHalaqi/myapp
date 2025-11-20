@@ -15,6 +15,7 @@ Route::get('/test', function () {
     Route::post('register', [UserController::class, 'register']);
     Route::post('verify_otp', [UserController::class, 'verify']);
     Route::post('login', [UserController::class, 'login']);
+    Route::get('agencies', [ComplaintController::class, 'getAgencies']);
     Route::post('admin/login', [AdminController::class, 'adminLogin']); // تسجيل دخول خاص للأدمن
 Route::middleware('auth:sanctum')->group(function(){
     // تسجيل الخروج
@@ -40,7 +41,7 @@ Route::post('complaints/{id}/lock', [ComplaintController::class,'lock']);
 });
 
 
- 
+
 
 
 

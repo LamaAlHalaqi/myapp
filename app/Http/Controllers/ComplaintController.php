@@ -276,4 +276,10 @@ class ComplaintController extends Controller
             'data' => $complaints
         ]);
     }
+
+        public function getAgencies()
+    {
+        $agencies = DB::table('agencies')->select('id', 'name')->get();
+        return response()->json($agencies);
+    }
 }

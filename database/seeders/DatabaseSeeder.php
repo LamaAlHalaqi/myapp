@@ -54,7 +54,7 @@ class DatabaseSeeder extends Seeder
 
         // تأكد من تشغيل seeder الوزارات أيضاً
         // يستخدم استدعاء الكلاس مباشرة بحيث لا تحتاج لتمرير اسم النصيّة عند تشغيل db:seed
-        $this->call(AgenciesTableSeeder::class);
+        $this->call([AgenciesTableSeeder::class]);
 
         $this->command->info('✅ تم إنشاء المستخدمين والوزارات بنجاح!');
     }
