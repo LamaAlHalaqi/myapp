@@ -12,4 +12,6 @@ class Complaint extends Model {
     public function agency() { return $this->belongsTo(Agency::class); }
     public function attachments() { return $this->hasMany(ComplaintAttachment::class); }
     public function logs() { return $this->hasMany(ComplaintLog::class); }
+    public function notes() { return $this->hasMany(ComplaintNote::class); }
+    public function informationRequests() { return $this->hasMany(InformationRequest::class); }
 }

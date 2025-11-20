@@ -9,10 +9,17 @@ class AgenciesTableSeeder extends Seeder
 {
     public function run()
     {
-        DB::table('agencies')->insert([
-            ['name' => 'وزارة الداخلية'],
-            ['name' => 'وزارة الصحة'],
-            ['name' => 'البلدية'],
-        ]);
+        $agencies = [
+            'وزارة الداخلية',
+            'وزارة الصحة',
+            'البلدية',
+        ];
+
+        foreach ($agencies as $name) {
+            DB::table('agencies')->updateOrInsert(
+                ['name' => $name],
+                ['updated_at' => now(), 'created_at' => now()]
+            );
+        }
     }
 }
