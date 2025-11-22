@@ -83,7 +83,7 @@ class AdminController extends Controller
                   ->orWhere('description', 'like', '%' . $request->search . '%');
         }
 
-        $complaints = $query->paginate(20);
+        $complaints = $query->get();
 
         return response()->json([
             'message' => 'قائمة الشكاوى',
@@ -144,13 +144,15 @@ class AdminController extends Controller
         $action = $request->query('action'); // عرض أو تعديل
         $userId = $request->query('user_id');
 
-        // عرض جميع المستخدمين
+        // عرض جميع الموظفين
+
         if (!$action) {
             $users = User::select('id', 'name', 'email', 'role', 'is_verified', 'created_at')
+                         ->where('role', 'employee')
                          ->get();
 
             return response()->json([
-                'message' => 'قائمة المستخدمين',
+                'message' => 'قائمة الموظفين',
                 'data' => $users,
             ]);
         }

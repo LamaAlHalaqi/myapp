@@ -8,7 +8,7 @@ use App\Models\InformationRequest;
 use App\Repositories\ComplaintRepository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-
+use Illuminate\Support\Facades\DB;
 class ComplaintController extends Controller
 {
     protected $repo;
@@ -93,6 +93,9 @@ class ComplaintController extends Controller
     // تعديل حالة الشكوى
     public function updateStatus(Request $request, $id)
     {
+          if (auth()->user()->role !== 'admin') {
+        return response()->json(['message' => 'ليس لديك صلاحية لتغيير حالة الشكوى'], 403);
+    }
         $request->validate([
             'status' => 'required|in:new,in_progress,done,rejected',
             'note' => 'nullable|string'

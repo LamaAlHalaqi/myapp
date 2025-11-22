@@ -48,11 +48,11 @@ Route::post('complaints/{id}/lock', [ComplaintController::class,'lock']);
 // ============ Endpoints الإدارة (محمية بـ auth:sanctum فقط، والتحقق من role في Controller) ============
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function(){
     // إدارة الشكاوى
-    Route::get('/complaints', [AdminController::class, 'indexComplaints'])->name('admin.complaints');
+    Route::get('/showcomplaints', [AdminController::class, 'indexComplaints'])->name('admin.complaints');
 
     // إدارة الموظفين والمستخدمين
     Route::post('/employees', [AdminController::class, 'createEmployee'])->name('admin.create_employee');
-    Route::get('/users', [AdminController::class, 'manageUsers'])->name('admin.manage_users');
+    Route::get('/allEmployees', [AdminController::class, 'manageUsers'])->name('admin.manage_users');
 
     // الإحصائيات والسجلات
     Route::get('/statistics', [AdminController::class, 'viewStatistics'])->name('admin.statistics');
