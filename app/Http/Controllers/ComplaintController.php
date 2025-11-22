@@ -93,7 +93,7 @@ class ComplaintController extends Controller
     // تعديل حالة الشكوى
     public function updateStatus(Request $request, $id)
     {
-          if (auth()->user()->role !== 'admin') {
+          if (auth()->user()->role !== 'employee') {
         return response()->json(['message' => 'ليس لديك صلاحية لتغيير حالة الشكوى'], 403);
     }
         $request->validate([
@@ -105,6 +105,10 @@ class ComplaintController extends Controller
         if (!$complaint) {
             return response()->json(['message' => 'الشكوى غير موجودة'], 404);
         }
+             if (auth()->user()->role === 'employee' && $complaint->agency_id !== auth()->user()->agency_id) {
+        return response()->json(['message' => 'لا يمكنك تعديل شكوى ليست ضمن جهتك'], 403);
+    }
+
 
         $this->repo->updateStatus($complaint, $request->status);
 
