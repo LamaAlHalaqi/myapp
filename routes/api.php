@@ -52,6 +52,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function(){
 
     // إدارة الموظفين والمستخدمين
     Route::post('/employees', [AdminController::class, 'createEmployee'])->name('admin.create_employee');
+    Route::get('/employees', [AdminController::class, 'manageEmployees'])->name('admin.manage_employees');
     Route::get('/users', [AdminController::class, 'manageUsers'])->name('admin.manage_users');
 
     // الإحصائيات والسجلات

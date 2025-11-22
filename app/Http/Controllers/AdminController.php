@@ -131,6 +131,28 @@ class AdminController extends Controller
         ], 201);
     }
 
+     public function manageEmployees(Request $request)
+    {
+        // التحقق من أن المستخدم أدمن
+        if (auth()->user()->role !== 'admin') {
+            return response()->json(['message' => 'ليس لديك صلاحية للوصول'], 403);
+        }
+
+        $action = $request->query('action'); // عرض أو تعديل
+        $userId = $request->query('user_id');
+
+        // عرض جميع الموظفين
+        if (!$action) {
+            $users = User::select('id', 'name', 'email', 'role', 'is_verified', 'created_at')
+                         ->where('role', 'employee')
+                         ->get();
+
+            return response()->json([
+                'message' => 'قائمة الموظفين',
+                'data' => $users,
+            ]);
+        }
+    }
     /**
      * إدارة حسابات المستخدمين (عرض، تفعيل، تعطيل، حذف)
      */
@@ -144,8 +166,7 @@ class AdminController extends Controller
         $action = $request->query('action'); // عرض أو تعديل
         $userId = $request->query('user_id');
 
-        // عرض جميع الموظفين
-
+        // عرض جميع المستخدمين
         if (!$action) {
             $users = User::select('id', 'name', 'email', 'role', 'is_verified', 'created_at')
                          ->where('role', 'user')
@@ -180,6 +201,8 @@ class AdminController extends Controller
 
         return response()->json(['message' => 'إجراء غير معروف'], 400);
     }
+
+
 
     /**
      * عرض الإحصائيات والسجلات
