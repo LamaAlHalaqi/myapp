@@ -148,11 +148,11 @@ class AdminController extends Controller
 
         if (!$action) {
             $users = User::select('id', 'name', 'email', 'role', 'is_verified', 'created_at')
-                         ->where('role', 'employee')
+                         ->where('role', 'user')
                          ->get();
 
             return response()->json([
-                'message' => 'قائمة الموظفين',
+                'message' => 'قائمة المستخدمين',
                 'data' => $users,
             ]);
         }
