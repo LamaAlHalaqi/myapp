@@ -9,6 +9,7 @@ use App\Repositories\ComplaintRepository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 class ComplaintController extends Controller
 {
     protected $repo;
@@ -283,6 +284,65 @@ class ComplaintController extends Controller
             'data' => $complaints
         ]);
     }
+
+    public function getUserComplaints()
+{
+    // تأكدي أن المستخدم له صلاحية (اختياري حسب نظامك)
+    if (auth()->user()->role !== 'user') {
+        return response()->json(['message' => 'هذا الـ endpoint للمستخدمين فقط'], 403);
+    }
+
+    $complaints = Complaint::where('user_id', auth()->id())
+                            ->with(['attachments', 'logs', 'notes', 'informationRequests'])
+                            ->get();
+
+    return response()->json([
+        'message' => 'الشكاوى الخاصة بك',
+        'data' => $complaints
+    ]);
+}
+public function deleteComplaint($id)
+{
+    $user = auth()->user();
+
+    // جلب الشكوى
+    $complaint = Complaint::find($id);
+
+    if (!$complaint) {
+        return response()->json(['message' => 'الشكوى غير موجودة'], 404);
+    }
+
+    // صلاحيات الحذف
+    if ($user->role === 'user') {
+        // المستخدم يحذف فقط شكاويه
+        if ($complaint->user_id !== $user->id) {
+            return response()->json(['message' => 'غير مسموح بحذف شكوى لا تخصك'], 403);
+        }
+    } elseif ($user->role === 'employee') {
+        // الموظف ممنوع من الحذف
+        return response()->json(['message' => 'ليس لديك صلاحية لحذف الشكاوى'], 403);
+    }
+    // الـ admin يصل له هنا لأنه مسموح له يحذف كل شيء
+
+    // حذف المرفقات إذا عندك علاقة attachments
+    if ($complaint->attachments) {
+        foreach ($complaint->attachments as $attachment) {
+            // حذف الملف من التخزين
+            if (Storage::exists($attachment->path)) {
+                Storage::delete($attachment->path);
+            }
+            $attachment->delete();
+        }
+    }
+
+    // حذف الشكوى نفسها
+    $complaint->delete();
+
+    return response()->json([
+        'message' => 'تم حذف الشكوى بنجاح'
+    ]);
+}
+
 
         public function getAgencies()
     {

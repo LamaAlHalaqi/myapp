@@ -11,6 +11,9 @@ Route::get('/test', function () {
     return response()->json(['message' => 'API is working in Laravel 12!']);
 });
 
+Route::get('/test', function () {
+    return response()->json(['server' => request()->server('SERVER_PORT')]);
+});
 
     Route::post('register', [UserController::class, 'register']);
     Route::post('verify_otp', [UserController::class, 'verify']);
@@ -29,6 +32,8 @@ Route::post('complaints/{id}/lock', [ComplaintController::class,'lock']);
     Route::get('complaints', [ComplaintController::class,'allComplaints']);
      // الموظفون: عرض الشكاوى الخاصة بجهتهم
  Route::get('agency/complaints', [ComplaintController::class,'getAgencyComplaints']);
+ Route::get('user/complaints', [ComplaintController::class,'getUserComplaints']);
+ Route::delete('complaints/{id}', [ComplaintController::class,'deleteComplaint']);
 // تفاصيل الشكوى مع الملاحظات والطلبات
     Route::get('complaints/{id}', [ComplaintController::class,'getComplaintDetails']);
 

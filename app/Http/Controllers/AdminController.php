@@ -7,6 +7,7 @@ use App\Models\Complaint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Response;
 
 class AdminController extends Controller
 {
@@ -208,42 +209,49 @@ class AdminController extends Controller
      * عرض الإحصائيات والسجلات
      */
     public function viewStatistics(Request $request)
-    {
-        // التحقق من أن المستخدم أدمن
-        if (auth()->user()->role !== 'admin') {
-            return response()->json(['message' => 'ليس لديك صلاحية للوصول'], 403);
-        }
-
-        $stats = [
-            'total_users' => User::count(),
-            'verified_users' => User::where('is_verified', true)->count(),
-            'unverified_users' => User::where('is_verified', false)->count(),
-            'total_complaints' => Complaint::count(),
-            'pending_complaints' => Complaint::where('status', 'pending')->count(),
-            'resolved_complaints' => Complaint::where('status', 'resolved')->count(),
-            'users_by_role' => User::selectRaw('role, count(*) as count')
-                                     ->groupBy('role')
-                                     ->get(),
-        ];
-
-        return response()->json([
-            'message' => 'الإحصائيات والسجلات',
-            'data' => $stats,
-        ]);
+{
+    // التحقق من الصلاحية
+    if (auth()->user()->role !== 'admin') {
+        return response()->json(['message' => 'ليس لديك صلاحية للوصول'], 403);
     }
 
-    /**
-     * تصدير التقارير إلى CSV أو JSON
-     */
-    public function exportReports(Request $request)
-    {
-        // التحقق من أن المستخدم أدمن
-        if (auth()->user()->role !== 'admin') {
-            return response()->json(['message' => 'ليس لديك صلاحية للوصول'], 403);
-        }
+    $stats = [
+        'total_users'        => User::count(),
+        'verified_users'     => User::where('is_verified', true)->count(),
+        'unverified_users'   => User::where('is_verified', false)->count(),
+        'total_complaints'   => Complaint::count(),
+        'pending_complaints' => Complaint::where('status', 'in_progress')->count(),
+        'resolved_complaints'=> Complaint::where('status', 'done')->count(),
+        'users_by_role'      => User::selectRaw('role, count(*) as count')
+                                    ->groupBy('role')
+                                    ->get(),
+    ];
 
-        $type = $request->query('type', 'json'); // json أو csv
-        $report_type = $request->query('report', 'complaints'); // complaints أو users
+    return response()->json([
+        'message' => 'الإحصائيات والسجلات',
+        'data'    => $stats,
+    ]);
+}
+
+
+
+/**
+ * 🔥 تصدير التقارير (CSV + JSON) بكفاءة عالية
+ */
+public function exportReports(Request $request)
+{
+    // الصلاحية
+    if (auth()->user()->role !== 'admin') {
+        return response()->json(['message' => 'ليس لديك صلاحية للوصول'], 403);
+    }
+
+    $type        = $request->query('type', 'json');       // json أو csv
+    $report_type = $request->query('report', 'complaints'); // complaints أو users
+
+    /**
+     * 1) ------------------------ JSON EXPORT ------------------------
+     */
+    if ($type === 'json') {
 
         if ($report_type === 'complaints') {
             $data = Complaint::with('user')->get();
@@ -251,57 +259,87 @@ class AdminController extends Controller
             $data = User::all();
         }
 
-        // تصدير كـ JSON
-        if ($type === 'json') {
-            return response()->json([
-                'message' => 'تقرير التصدير',
-                'report_type' => $report_type,
-                'data' => $data,
-            ]);
-        }
+        return response()->json([
+            'message' => 'تم إنشاء التقرير',
+            'report_type' => $report_type,
+            'data' => $data
+        ]);
+    }
 
-        // تصدير كـ CSV (بسيط بدون مكتبة خارجية)
-        if ($type === 'csv') {
-            $filename = $report_type . '_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
-            $handle = fopen('php://memory', 'r+');
 
-            // كتابة الرؤوس
+    /**
+     * 2) ------------------------ CSV EXPORT ------------------------
+     */
+    if ($type === 'csv') {
+
+        $filename = $report_type . '_report_' . now()->format('Y-m-d_H-i-s') . '.csv';
+
+        return response()->streamDownload(function () use ($report_type) {
+            $filename = "users.csv";
+$headers = [
+    "Content-Type" => "text/csv; charset=UTF-8",
+    "Content-Disposition" => "attachment; filename=\"$filename\"",
+];
+
+
+            // فتح إخراج الملف المباشر
+            $handle = fopen('php://output', 'w');
+
+            // كتابة BOM لتحسين العربية في Excel
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            /**
+             * --- تقرير الشكاوى ---
+             */
             if ($report_type === 'complaints') {
-                fputcsv($handle, ['ID', 'الموضوع', 'الوصف', 'المستخدم', 'الحالة', 'التاريخ']);
-                foreach ($data as $row) {
-                    fputcsv($handle, [
-                        $row->id,
-                        $row->title,
-                        $row->description,
-                        $row->user->name,
-                        $row->status,
-                        $row->created_at,
-                    ]);
-                }
-            } else {
-                fputcsv($handle, ['ID', 'الاسم', 'البريد', 'الدور', 'مفعّل', 'التاريخ']);
-                foreach ($data as $row) {
-                    fputcsv($handle, [
-                        $row->id,
-                        $row->name,
-                        $row->email,
-                        $row->role,
-                        $row->is_verified ? 'نعم' : 'لا',
-                        $row->created_at,
-                    ]);
-                }
+
+                // رؤوس الأعمدة
+                fputcsv($handle, ['ID','الموضوع','الوصف','المستخدم','الحالة','التاريخ']);
+
+                Complaint::with('user')->chunk(500, function ($rows) use ($handle) {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->title,
+                            $row->description,
+                            optional($row->user)->name,
+                            $row->status,
+                            $row->created_at->toDateTimeString()
+                        ],';');
+                    }
+                });
+
+            }
+            /**
+             * --- تقرير المستخدمين ---
+             */
+            else {
+
+                fputcsv($handle, ['ID','name','email','role','verified?'], ',');
+
+                User::chunk(500, function ($rows) use ($handle) {
+                    foreach ($rows as $row) {
+                        fputcsv($handle, [
+                            $row->id,
+                            $row->name,
+                            $row->email,
+                            $row->role,
+                            $row->is_verified ? 'نعم' : 'لا',
+                          //  $row->created_at->toDateTimeString()
+                        ],',');
+                    }
+                });
             }
 
-            rewind($handle);
-            $csv = stream_get_contents($handle);
+
             fclose($handle);
 
-            return response($csv, 200, [
-                'Content-Type' => 'text/csv; charset=utf-8',
-                'Content-Disposition' => "attachment; filename=\"$filename\"",
-            ]);
-        }
 
-        return response()->json(['message' => 'نوع التصدير غير مدعوم'], 400);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=utf-8',
+        ]);
     }
+
+    return response()->json(['message' => 'نوع التصدير غير مدعوم'], 400);
+}
 }
