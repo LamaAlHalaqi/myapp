@@ -38,8 +38,14 @@ class DatabaseSeeder extends Seeder
         // إنشاء مستخدم عادي للاختبار (آمن من التكرار)
         User::updateOrCreate(
             ['email' => 'test@example.com'],
-            ['name' => 'Test User']
+            [
+                'name' => 'Test User',
+                'password' => Hash::make('test123456'),
+                'role' => 'user', // حسب النظام عندك ممكن تضيف دور هنا
+                'is_verified' => true,
+            ]
         );
+
 
         // إنشاء موظف للاختبار (آمن من التكرار)
         User::updateOrCreate(

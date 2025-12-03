@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Storage;
 class ComplaintController extends Controller
 {
     protected $repo;
+    protected $lockDurationMinutes = 15; // المهلة15 دقائق
+
 
     public function __construct(ComplaintRepository $repo)
     {
@@ -22,47 +24,57 @@ class ComplaintController extends Controller
     // تقديم شكوى جديدة
     public function submit(Request $request)
     {
-        // Validation
         $request->validate([
             'agency_id' => 'required|exists:agencies,id',
-            'type' => 'nullable|in:خدمة,مرفق,سلوك,آخر',
-            'location' => 'required|in:دمشق,حلب,درعا,حمص,الرقة,دير الزور,اللاذقية,طرطوس,ادلب,السويداء,القنيطرة,الحسكة,ريف دمشق,حماة',
+            'type' => 'nullable|in:خدمة,مرفق,سلوك,آخر', 'location' => 'required|in:دمشق,حلب,درعا,حمص,الرقة,دير الزور,اللاذقية,طرطوس,ادلب,السويداء,القنيطرة,الحسكة,ريف دمشق,حماة',
             'description' => 'required|string',
             'attachments.*' => 'file|mimes:jpg,png,pdf,doc,docx,xls,xlsx|max:10240',
         ]);
 
-        // توليد رقم مرجعي آمن
         $reference = 'REF-' . strtoupper(Str::random(10));
 
-        // إنشاء الشكوى
-        $complaint = $this->repo->createComplaint([
-            'user_id' => auth()->id(),
-            'agency_id' => $request->agency_id,
-            'type' => $request->type,
-            'location' => $request->location,
-            'description' => $request->description,
-            'reference' => $reference
-        ]);
+        $attachmentsResponse = [];
 
-        // رفع المرفقات
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
-                $path = $file->store('complaints', 'public');
-                $complaint->attachments()->create([
-                    'path' => $path,
-                    'mime' => $file->getClientMimeType()
-                ]);
+        DB::transaction(function () use ($request, $reference, &$attachmentsResponse) {
+
+            // إنشاء الشكوى
+            $complaint = $this->repo->createComplaint([
+                'user_id' => auth()->id(),
+                'agency_id' => $request->agency_id,
+                'type' => $request->type,
+                'location' => $request->location,
+                'description' => $request->description,
+                'reference' => $reference
+            ]);
+
+            // رفع المرفقات
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $path = $file->store('complaints', 'public');
+
+                    $attachment = $complaint->attachments()->create([
+                        'path' => $path,
+                        'mime' => $file->getClientMimeType()
+                    ]);
+
+                    $attachmentsResponse[] = [
+                        'id' => $attachment->id,
+                        'mime' => $attachment->mime,
+                        'url' => asset('storage/' . $path)
+                    ];
+                }
             }
-        }
 
-        // حذف الكاش لتحديث البيانات
-        Cache::forget("user_complaints_" . auth()->id());
+            Cache::forget("user_complaints_" . auth()->id());
+        });
 
         return response()->json([
             'message' => 'تم تقديم الشكوى بنجاح',
-            'reference' => $reference
+            'reference' => $reference,
+            'attachments' => $attachmentsResponse
         ], 201);
     }
+
 
     // قفل الشكوى
     public function lock($id)
@@ -103,6 +115,15 @@ class ComplaintController extends Controller
         ]);
 
         $complaint = $this->repo->findById($id);
+        $this->checkLockTimeout($complaint);
+
+        // منع تعديل الشكوى إذا محجوزة من موظف آخر
+        if ($complaint->is_locked && $complaint->locked_by !== auth()->id()) {
+            return response()->json([
+                'message' => 'لا يمكن تعديل الشكوى لأنها قيد المعالجة من قبل موظف آخر'
+            ], 409);
+        }
+
         if (!$complaint) {
             return response()->json(['message' => 'الشكوى غير موجودة'], 404);
         }
@@ -146,17 +167,36 @@ class ComplaintController extends Controller
     public function getComplaintDetails($id)
     {
         $complaint = Complaint::with(['attachments', 'logs', 'notes', 'informationRequests'])
-                             ->find($id);
+            ->find($id);
 
         if (!$complaint) {
             return response()->json(['message' => 'الشكوى غير موجودة'], 404);
         }
 
-        // التحقق من أن المستخدم صاحب الشكوى أو موظف في الجهة
+        // التحقق من أن المستخدم صاحب الشكوى أو موظف/أدمن
         if ($complaint->user_id !== auth()->id() && auth()->user()->role !== 'admin') {
             if (auth()->user()->role === 'employee' && $complaint->agency_id !== auth()->user()->agency_id) {
                 return response()->json(['message' => 'ليس لديك صلاحية الوصول'], 403);
             }
+        }
+
+        // إضافة رابط العرض وتصنيف نوع المرفق
+        if ($complaint->attachments) {
+            $complaint->attachments->transform(function($attachment) {
+                $attachment->url = asset('storage/' . $attachment->path);
+
+                if(str_contains($attachment->mime, 'image/')) {
+                    $attachment->type = 'image';
+                } elseif(str_contains($attachment->mime, 'pdf')) {
+                    $attachment->type = 'pdf';
+                } elseif(str_contains($attachment->mime, 'word') || str_contains($attachment->mime, 'excel') || str_contains($attachment->mime, 'msword') || str_contains($attachment->mime, 'vnd.openxmlformats-officedocument')) {
+                    $attachment->type = 'document';
+                } else {
+                    $attachment->type = 'other';
+                }
+
+                return $attachment;
+            });
         }
 
         return response()->json([
@@ -164,6 +204,7 @@ class ComplaintController extends Controller
             'data' => $complaint
         ]);
     }
+
 
     // إضافة ملاحظة (للموظفين فقط)
     public function addNote(Request $request, $id)
@@ -179,6 +220,15 @@ class ComplaintController extends Controller
         ]);
 
         $complaint = Complaint::find($id);
+        $this->checkLockTimeout($complaint);
+
+        // منع إضافة ملاحظة إذا الشكوى محجوزة من موظف آخر
+        if ($complaint->is_locked && $complaint->locked_by !== auth()->id()) {
+            return response()->json([
+                'message' => 'لا يمكنك إضافة ملاحظة لأن الشكوى قيد المعالجة من موظف آخر'
+            ], 409);
+        }
+
         if (!$complaint) {
             return response()->json(['message' => 'الشكوى غير موجودة'], 404);
         }
@@ -214,6 +264,15 @@ class ComplaintController extends Controller
         ]);
 
         $complaint = Complaint::find($id);
+        $this->checkLockTimeout($complaint);
+
+        // منع طلب معلومات إذا الشكوى محجوزة من موظف آخر
+        if ($complaint->is_locked && $complaint->locked_by !== auth()->id()) {
+            return response()->json([
+                'message' => 'لا يمكنك طلب معلومات لأن الشكوى قيد المعالجة من موظف آخر'
+            ], 409);
+        }
+
         if (!$complaint) {
             return response()->json(['message' => 'الشكوى غير موجودة'], 404);
         }
@@ -301,47 +360,45 @@ class ComplaintController extends Controller
         'data' => $complaints
     ]);
 }
-public function deleteComplaint($id)
-{
-    $user = auth()->user();
+    public function deleteComplaint($id)
+    {
+        $user = auth()->user();
 
-    // جلب الشكوى
-    $complaint = Complaint::find($id);
+        // جلب الشكوى
+        $complaint = Complaint::with('attachments')->find($id);
 
-    if (!$complaint) {
-        return response()->json(['message' => 'الشكوى غير موجودة'], 404);
-    }
-
-    // صلاحيات الحذف
-    if ($user->role === 'user') {
-        // المستخدم يحذف فقط شكاويه
-        if ($complaint->user_id !== $user->id) {
-            return response()->json(['message' => 'غير مسموح بحذف شكوى لا تخصك'], 403);
+        if (!$complaint) {
+            return response()->json(['message' => 'الشكوى غير موجودة'], 404);
         }
-    } elseif ($user->role === 'employee') {
-        // الموظف ممنوع من الحذف
-        return response()->json(['message' => 'ليس لديك صلاحية لحذف الشكاوى'], 403);
-    }
-    // الـ admin يصل له هنا لأنه مسموح له يحذف كل شيء
 
-    // حذف المرفقات إذا عندك علاقة attachments
-    if ($complaint->attachments) {
-        foreach ($complaint->attachments as $attachment) {
-            // حذف الملف من التخزين
-            if (Storage::exists($attachment->path)) {
-                Storage::delete($attachment->path);
+        // صلاحيات الحذف
+        if ($user->role === 'user') {
+            if ($complaint->user_id !== $user->id) {
+                return response()->json(['message' => 'غير مسموح بحذف شكوى لا تخصك'], 403);
             }
-            $attachment->delete();
+        } elseif ($user->role === 'employee') {
+            return response()->json(['message' => 'ليس لديك صلاحية لحذف الشكاوى'], 403);
         }
+        // admin يمكنه الحذف
+
+        DB::transaction(function () use ($complaint) {
+            // حذف المرفقات من التخزين وقاعدة البيانات
+            foreach ($complaint->attachments as $attachment) {
+                if (Storage::exists($attachment->path)) {
+                    Storage::delete($attachment->path);
+                }
+                $attachment->delete();
+            }
+
+            // حذف الشكوى نفسها
+            $complaint->delete();
+        });
+
+        return response()->json([
+            'message' => 'تم حذف الشكوى بنجاح'
+        ]);
     }
 
-    // حذف الشكوى نفسها
-    $complaint->delete();
-
-    return response()->json([
-        'message' => 'تم حذف الشكوى بنجاح'
-    ]);
-}
 
 
         public function getAgencies()
@@ -349,4 +406,19 @@ public function deleteComplaint($id)
         $agencies = DB::table('agencies')->select('id', 'name')->get();
         return response()->json($agencies);
     }
+    protected function checkLockTimeout(Complaint $complaint)
+    {
+        if ($complaint->is_locked && $complaint->locked_at) {
+            $lockedAt = $complaint->locked_at;
+            if (now()->diffInMinutes($lockedAt) >= $this->lockDurationMinutes) {
+                // انتهاء المهلة → فك القفل تلقائياً
+                $complaint->update([
+                    'is_locked' => false,
+                    'locked_by' => null,
+                    'locked_at' => null
+                ]);
+            }
+        }
+    }
+
 }
