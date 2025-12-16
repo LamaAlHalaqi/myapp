@@ -25,6 +25,7 @@ class User extends Authenticatable
         'role',
         'otp',
         'is_verified',
+        'agency_id',
     ];
 
     /**
@@ -52,4 +53,12 @@ class User extends Authenticatable
         'password' => 'hashed',
         'is_verified' => 'boolean',
     ];
+
+    /**
+     * علاقة المستخدم مع الجهة الحكومية
+     */
+    public function agency()
+    {
+        return $this->belongsTo(Agency::class);
+    }
 }
