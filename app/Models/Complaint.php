@@ -14,4 +14,5 @@ class Complaint extends Model {
     public function logs() { return $this->hasMany(ComplaintLog::class); }
     public function notes() { return $this->hasMany(ComplaintNote::class); }
     public function informationRequests() { return $this->hasMany(InformationRequest::class); }
+
 }

@@ -79,7 +79,7 @@ class UserController extends Controller
 }
  public function login(Request $request)
     {
-        // ✅ التحقق من صحة البيانات
+
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required|string|min:6',
@@ -92,12 +92,12 @@ class UserController extends Controller
             ], 401);
         }
 
-        // ✅ جلب المستخدم الحالي بعد التحقق
+
         $user = Auth::user();
 
         // تحقق من تفعيل الحساب
         if (!$user->is_verified) {
-            // تسجيل الخروج لأن الحساب غير مفعّل
+            // تسجيل الخروج في حال الحساب غير مفعل
             Auth::logout();
 
             return response()->json([

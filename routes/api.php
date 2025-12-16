@@ -66,3 +66,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function(){
     // تصدير التقارير
     Route::get('/export-reports', [AdminController::class, 'exportReports'])->name('admin.export_reports');
 });
+use App\Http\Controllers\AgencyController;
+
+Route::middleware('auth:sanctum')->group(function () {
+  //  Route::get('/agencies', [AgencyController::class, 'index']); // عرض الجهات
+    Route::post('/agencies', [AgencyController::class, 'store']); // إضافة جهة
+    Route::put('/agencies/{id}', [AgencyController::class, 'update']); // تعديل جهة
+    Route::delete('/agencies/{id}', [AgencyController::class, 'destroy']); // حذف جهة
+});

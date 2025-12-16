@@ -13,8 +13,7 @@ return new class extends Migration
     {
         Schema::create('agencies', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // ← هذا العمود مفقود ويجب إضافته
-
+            $table->string('name');
             $table->timestamps();
         });
     }
